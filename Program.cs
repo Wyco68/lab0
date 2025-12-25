@@ -154,12 +154,25 @@ public partial class Crawler
 }
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        Crawler cw = new();
-        // Can you improve this code?
-        cw.SetBasedFolder(".");
-        cw.SetMaxLinksPerPage(5);
-        cw.GetPage("https://dandadan.net/", 2).Wait();
+        string baseFolder = args.Length > 0 ? args[0] : "pages";
+        string startUrl = args.Length > 1 ? args[1] : "https://dandadan.net/";
+        int depth = args.Length > 2 && int.TryParse(args[2], out var d) ? d : 2;
+
+        Directory.CreateDirectory(baseFolder);
+
+        var crawler = new Crawler();
+        crawler.SetBasedFolder(baseFolder);
+        crawler.SetMaxLinksPerPage(5);
+
+        try
+        {
+            await crawler.GetPage(startUrl, depth);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+        }
     }
 }
