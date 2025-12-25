@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 
 namespace simple_crawler;
 
@@ -8,9 +8,11 @@ namespace simple_crawler;
 /// </summary>
 public partial class Crawler
 {
-    
+
     protected String? basedFolder = null;
     protected int maxLinksPerPage = 3;
+    // track visited URLs to avoid cycles
+    protected System.Collections.Generic.HashSet<string> visitedUrls = new();
 
     /// <summary>
     /// Method <c>SetBasedFolder</c> sets based folder to store retrieved contents.
@@ -53,6 +55,13 @@ public partial class Crawler
             throw new ArgumentNullException(nameof(url));
         }
 
+        // stop at depth 0 limit
+        if (level < 0) return;
+
+        // avoid revisiting same URL
+        if (visitedUrls.Contains(url)) return;
+        visitedUrls.Add(url);
+
         // For simplicity, we will use <c>HttpClient</c> here, but if you want you can try <c>TcpClient</c>
         HttpClient client = new();
 
@@ -74,13 +83,32 @@ public partial class Crawler
                 foreach (String link in links)
                 {
                     // We only interested in http/https link
-                    if(link.StartsWith("http", StringComparison.InvariantCultureIgnoreCase))
+                    try
                     {
-                        // Your code here
-                        // Note: It should be recursive operation here
+                        // resolve relative links against parent url
+                        string next = link;
+                        try
+                        {
+                            var baseUri = new Uri(url);
+                            var resolved = new Uri(baseUri, link);
+                            next = resolved.ToString();
+                        }
+                        catch { /* leave as-is if not resolvable */ }
 
-                        // limit number of links in the page, otherwise it will load lots of data
-                        if (++count >= maxLinksPerPage) break;
+                        if (next.StartsWith("http", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            // recurse crawl if depth allows
+                            if (level > 0)
+                            {
+                                await GetPage(next, level - 1);
+                            }
+                            // limit number of links in the page, otherwise it will load lots of data
+                            if (++count >= maxLinksPerPage) break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Failed to process link {0}: {1}", link, ex.Message);
                     }
                 }
             }
